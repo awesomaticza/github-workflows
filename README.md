@@ -1,5 +1,14 @@
 # GitHub Actions Workflows
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docs](https://img.shields.io/badge/docs-awesomaticza.github.io%2Fgithub--workflows-blue)](https://awesomaticza.github.io/github-workflows/)
+[![Deploy Docs](https://github.com/awesomaticza/github-workflows/actions/workflows/deploy-docs.yml/badge.svg)](https://github.com/awesomaticza/github-workflows/actions/workflows/deploy-docs.yml)
+[![Java 21](https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![Maven](https://img.shields.io/badge/Maven-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
+[![AWS ECR](https://img.shields.io/badge/AWS-ECR-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/ecr/)
+[![AWS CodeArtifact](https://img.shields.io/badge/AWS-CodeArtifact-FF9900?logo=amazonaws&logoColor=white)](https://aws.amazon.com/codeartifact/)
+
 A library of reusable GitHub Actions workflows for the Awesomatic platform. Rather than duplicating CI/CD logic across every project, consuming projects reference these workflows via `workflow_call`, keeping pipelines consistent and changes centralised.
 
 ## Architecture
@@ -44,11 +53,11 @@ flowchart TD
     DEV_PR --> BUILD["build.yml"]
     MASTER_PR --> RELEASE["release.yml"]
 
-    BUILD -- "IMAGE_NAME absent" --> CA_S["AWS CodeArtifact<br/>SNAPSHOT artifact"]
-    BUILD -- "IMAGE_NAME present" --> ECR_B["AWS ECR<br/>x.x.x.build_num · latest · sha"]
+    BUILD -- "SERVICE_NAME absent" --> CA_S["AWS CodeArtifact<br/>SNAPSHOT artifact"]
+    BUILD -- "SERVICE_NAME present" --> ECR_B["AWS ECR<br/>x.x.x.build_num · latest · sha"]
 
-    RELEASE -- "IMAGE_NAME absent" --> CA_R["AWS CodeArtifact<br/>Release artifact"]
-    RELEASE -- "IMAGE_NAME present" --> ECR_R["AWS ECR<br/>x.x.x · latest · sha"]
+    RELEASE -- "SERVICE_NAME absent" --> CA_R["AWS CodeArtifact<br/>Release artifact"]
+    RELEASE -- "SERVICE_NAME present" --> ECR_R["AWS ECR<br/>x.x.x · latest · sha"]
     RELEASE --> TAG["Git Tag + GitHub Release"]
     TAG --> M2D["PR: merge/x.x.x → develop<br/>+ version bump"]
 
@@ -68,14 +77,14 @@ flowchart TD
 ```
 
 ### `build.yml`
-Triggered when a PR is merged into `develop`. Authenticates with AWS, configures Maven to resolve and deploy to AWS CodeArtifact, then publishes the artifact. If `IMAGE_NAME` is provided, builds a Docker image via `spring-boot:build-image` and pushes it to ECR tagged as `x.x.x.<build_number>`, `latest`, and the short commit hash. If `IMAGE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the SNAPSHOT artifact to CodeArtifact.
+Triggered when a PR is merged into `develop`. Authenticates with AWS, configures Maven to resolve and deploy to AWS CodeArtifact, then publishes the artifact. If `SERVICE_NAME` is provided, builds a Docker image via `spring-boot:build-image` and pushes it to ECR tagged as `x.x.x.<build_number>`, `latest`, and the short commit hash. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the SNAPSHOT artifact to CodeArtifact.
 
 ### `release.yml`
 Triggered when a PR is merged into `master`. Publishes the release artifact, then:
 1. Creates a git tag and GitHub release for the version in `pom.xml`
 2. Opens a PR to merge `master` back into `develop`, bumping the minor version (e.g. `1.2.0` → `1.3.0-SNAPSHOT`). For hotfixes (patch version > 0), the version bump is skipped.
 
-If `IMAGE_NAME` is provided, builds and pushes the Docker image to ECR tagged with the exact release version, `latest`, and the short commit hash before tagging. If `IMAGE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the release artifact to CodeArtifact.
+If `SERVICE_NAME` is provided, builds and pushes the Docker image to ECR tagged with the exact release version, `latest`, and the short commit hash before tagging. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the release artifact to CodeArtifact.
 
 ## How to Use
 
@@ -93,7 +102,7 @@ on:
 
 jobs:
   build-workflow:
-    uses: awesomaticza/github-actions-workflows/.github/workflows/build.yml@master
+    uses: awesomaticza/github-workflows/.github/workflows/build.yml@master
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
     secrets:
@@ -117,7 +126,7 @@ on:
 
 jobs:
   release-workflow:
-    uses: awesomaticza/github-actions-workflows/.github/workflows/release.yml@master
+    uses: awesomaticza/github-workflows/.github/workflows/release.yml@master
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
     secrets:
@@ -147,10 +156,10 @@ on:
 
 jobs:
   build-workflow:
-    uses: awesomaticza/github-actions-workflows/.github/workflows/build.yml@master
+    uses: awesomaticza/github-workflows/.github/workflows/build.yml@master
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      IMAGE_NAME: my-service
+      SERVICE_NAME: my-service
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
@@ -172,10 +181,10 @@ on:
 
 jobs:
   release-workflow:
-    uses: awesomaticza/github-actions-workflows/.github/workflows/release.yml@master
+    uses: awesomaticza/github-workflows/.github/workflows/release.yml@master
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      IMAGE_NAME: my-service
+      SERVICE_NAME: my-service
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
