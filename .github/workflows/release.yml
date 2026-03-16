@@ -1,0 +1,260 @@
+name: "Release Artifact"
+
+on:
+  workflow_call:
+    inputs:
+      AWS_REGION:
+        required: true
+        type: string
+      IMAGE_NAME:
+        required: false
+        type: string
+        default: ''
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      CI_APP_ID:
+        required: true
+      CI_APP_PRIVATE_KEY:
+        required: true
+      CODEARTIFACT_DOMAIN:
+        required: true
+      CODEARTIFACT_RELEASES_REPO:
+        required: true
+      CODEARTIFACT_SNAPSHOTS_REPO:
+        required: true
+
+concurrency:
+  group: ci-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: 'pom.xml'
+
+      - name: Set Variables
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.IMAGE_NAME }}"
+          IMAGE_TAG=$PROJECT_VERSION
+
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Print variables
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Auth via AWS ECR
+        if: inputs.IMAGE_NAME != ''
+        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
+
+      - name: Configure Maven for CodeArtifact
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ secrets.CODEARTIFACT_DOMAIN }} \
+            --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+            --query authorizationToken --output text)
+
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_RELEASES_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Deploy Release Artifact to AWS CodeArtifact
+        if: inputs.IMAGE_NAME == ''
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ inputs.AWS_REGION }}
+          CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+          CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+          CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+        run: mvn --no-transfer-progress deploy -B -Pbuild
+
+      - name: Build image
+        if: inputs.IMAGE_NAME != ''
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ inputs.AWS_REGION }}
+          CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+          CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+          CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+        run: mvn --quiet clean package -Pbuild spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
+
+      - name: Push image
+        if: inputs.IMAGE_NAME != ''
+        run: docker push $IMAGE_REGISTRY:$IMAGE_TAG
+
+      - name: Tag and Push Latest Image
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:latest
+          docker push $IMAGE_REGISTRY:latest
+
+      - name: Tag and Push Image with Git Commit Hash
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          COMMIT_HASH=$(git rev-parse --short=8 HEAD)
+          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:$COMMIT_HASH
+          docker push $IMAGE_REGISTRY:$COMMIT_HASH
+
+  tag-release:
+    needs: [ build ]
+    runs-on: ubuntu-latest
+    outputs:
+      release-version: ${{ steps.create-tag.outputs.RELEASE_VERSION }}
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Get GitHub App User ID
+        id: get-user-id
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> $GITHUB_OUTPUT
+      - name: Configure Git identity
+        run: |
+          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+
+      - name: Crate Tag
+        id: create-tag
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+
+          git tag -a "$RELEASE_VERSION" -m "release: $RELEASE_VERSION"
+          git push origin "$RELEASE_VERSION"
+          gh release create $RELEASE_VERSION --title "$RELEASE_VERSION" --generate-notes
+
+  merge-2-develop:
+    needs: [ tag-release ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - name: Get GitHub App User ID
+        id: get-user-id
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> $GITHUB_OUTPUT
+      - name: Configure Git identity
+        run: |
+          git config --global user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config --global user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+      - name: Open PR to align develop with master
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_VERSION: ${{ needs.tag-release.outputs.release-version }}
+        run: |
+          set -x # Enable debug output
+
+          message() {
+            echo -e "\n######################################################################"
+            echo "# $1"
+            echo "######################################################################"
+          }
+
+          message ">>> Starting PR"
+
+          [[ ! -x "$(command -v gh)" ]] && echo "gh not found, you need to install github CLI" && exit 1
+          [[ ! -x "$(command -v mvn)" ]] && echo "mvn not found, you need to install maven CLI" && exit 1
+
+          BRANCH_NAME="merge/$RELEASE_VERSION"
+          message ">>> Create $BRANCH_NAME from develop"
+          git checkout -b "$BRANCH_NAME"
+
+          # Fetch and merge from master, with the "ours" strategy for conflicts
+          message ">>> Fetch and merge from master"
+          git fetch origin
+          git merge -X ours origin/master --no-commit --no-ff
+
+          # Read the patch version from the latest release version.
+          IFS='.' read -r V_MAJOR V_MINOR V_PATCH <<< "$RELEASE_VERSION"
+          if [[ "$V_PATCH" -eq 0 ]]; then
+            message ">>> RELEASE_VERSION ($RELEASE_VERSION) is NOT a hotfix. Workout next dev sprint version."
+
+            message ">>> Increment V_MINOR by 1."
+            V_MINOR=$(expr $V_MINOR + 1)
+
+            message ">>> Set DEVELOPMENT_VERSION"
+            DEVELOPMENT_VERSION="$V_MAJOR.$V_MINOR.$V_PATCH-SNAPSHOT"
+
+            pom_file=$(find . -maxdepth 1 -name "pom.xml" -print -quit)
+            if [[ -n "$pom_file" ]]; then
+              echo "Update project version to $DEVELOPMENT_VERSION"
+              mvn versions:set -DnewVersion="$DEVELOPMENT_VERSION" --no-transfer-progress
+            else
+              echo "Error: pom.xml not found."
+              exit 1
+            fi
+          else
+            message ">>> RELEASE_VERSION ($RELEASE_VERSION) is a hotfix. Skip project version update."
+          fi
+
+          git commit --allow-empty -am "merge master into develop - $RELEASE_VERSION"
+          git push -u origin "$BRANCH_NAME"
+
+          gh pr create --base develop --head "$BRANCH_NAME" --title "Merge $RELEASE_VERSION into develop" --fill

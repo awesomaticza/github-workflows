@@ -1,0 +1,142 @@
+name: "Build Artifact"
+
+on:
+  workflow_call:
+    inputs:
+      AWS_REGION:
+        required: true
+        type: string
+      IMAGE_NAME:
+        required: false
+        type: string
+        default: ''
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      CODEARTIFACT_DOMAIN:
+        required: true
+      CODEARTIFACT_RELEASES_REPO:
+        required: true
+      CODEARTIFACT_SNAPSHOTS_REPO:
+        required: true
+
+concurrency:
+  group: ci-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: 'pom.xml'
+
+      - name: Set Variables
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          BUILD_NUMBER=${{ github.run_number }}
+          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.IMAGE_NAME }}"
+
+          if [[ "$PROJECT_VERSION" == *"-SNAPSHOT" ]]; then
+            RELEASE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/-SNAPSHOT//')
+          else
+            RELEASE_VERSION=$PROJECT_VERSION
+          fi
+
+          IMAGE_TAG="${RELEASE_VERSION}.${BUILD_NUMBER}"
+
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Print variables
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Auth via AWS ECR
+        if: inputs.IMAGE_NAME != ''
+        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
+
+      - name: Configure Maven for CodeArtifact
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ secrets.CODEARTIFACT_DOMAIN }} \
+            --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+            --query authorizationToken --output text)
+
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_RELEASES_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Deploy Library Artifact to AWS CodeArtifact
+        if: inputs.IMAGE_NAME == ''
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ inputs.AWS_REGION }}
+          CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+          CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+          CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+        run: mvn --no-transfer-progress deploy -B -Pbuild
+
+      - name: Build image
+        if: inputs.IMAGE_NAME != ''
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          AWS_REGION: ${{ inputs.AWS_REGION }}
+          CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+          CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+          CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+        run: mvn --quiet clean package -Pbuild spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
+
+      - name: Push image
+        if: inputs.IMAGE_NAME != ''
+        run: docker push $IMAGE_REGISTRY:$IMAGE_TAG
+
+      - name: Tag and Push Latest Image
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:latest
+          docker push $IMAGE_REGISTRY:latest
+
+      - name: Tag and Push Image with Git Commit Hash
+        if: inputs.IMAGE_NAME != ''
+        run: |
+          COMMIT_HASH=$(git rev-parse --short=8 HEAD)
+          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:$COMMIT_HASH
+          docker push $IMAGE_REGISTRY:$COMMIT_HASH
