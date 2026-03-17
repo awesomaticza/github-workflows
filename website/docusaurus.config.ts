@@ -23,7 +23,7 @@ const config: Config = {
 
   themes: ['@docusaurus/theme-mermaid'],
 
-  clientModules: ['./src/clientModules/zoom.js'],
+  plugins: ['docusaurus-plugin-image-zoom'],
 
   i18n: {
     defaultLocale: 'en',
@@ -78,6 +78,13 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+    },
+    zoom: {
+      selector: '.markdown img',
+      background: {
+        light: 'rgb(255, 255, 255)',
+        dark: 'rgb(50, 50, 50)',
+      },
     },
   } satisfies Preset.ThemeConfig,
 };
