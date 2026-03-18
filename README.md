@@ -15,12 +15,12 @@ A library of reusable GitHub Actions workflows for the Awesomatic platform. Rath
 
 ```mermaid
 flowchart TD
-    GHA["github-actions-workflows<br/>└─ workflows<br/>&nbsp;&nbsp;&nbsp;├─ build.yml<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ release.yml"]
+    GHA["github-workflows<br/>└─ workflows<br/>&nbsp;&nbsp;&nbsp;├─ build.yml<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ release.yml"]
 
-    LIB["&lt;&lt;library&gt;&gt;<br/>raise-event-registry"]
-    DEP["&lt;&lt;deployable&gt;&gt;<br/>raise-core"]
+    LIB["&lt;&lt;library&gt;&gt;<br/>commons"]
+    DEP["&lt;&lt;deployable&gt;&gt;<br/>web-application"]
 
-    GF["awesomatic-gitflow<br/>├─ Makefile<br/>└─ scripts<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ hotfix.sh<br/>&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ release.sh"]
+    GF["gitflow<br/>├─ Makefile<br/>└─ scripts<br/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├─ hotfix.sh<br/>&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ release.sh"]
 
     GHA -."Reuse GitHub Actions Scripts".-> LIB
     GHA -."Reuse GitHub Actions Scripts".-> DEP
@@ -38,10 +38,10 @@ Two types of projects consume these workflows:
 
 | Project type | Example | Build workflow | Release workflow |
 |---|---|---|---|
-| **Library** — Maven JAR published to AWS CodeArtifact | `raise-event-registry` | `build.yml` | `release.yml` |
-| **Deployable** — Spring Boot app published as Docker image to AWS ECR | `raise-core` | `build.yml` | `release.yml` |
+| **Library** — Maven JAR published to AWS CodeArtifact | `commons` | `build.yml` | `release.yml` |
+| **Deployable** — Spring Boot app published as Docker image to AWS ECR | `web-application` | `build.yml` | `release.yml` |
 
-Both project types also add `awesomatic-gitflow` as a git submodule to manage the `make release` / `make hotfix` commands that feed into these pipelines.
+Both project types also add [gitflow](https://github.com/awesomaticza/gitflow) as a git submodule to manage the `make release` / `make hotfix` commands that feed into these pipelines.
 
 ## Workflows
 
