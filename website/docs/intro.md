@@ -12,7 +12,7 @@ sidebar_position: 1
 It is the server-side counterpart to [gitflow](https://awesomaticza.github.io/gitflow/) — the developer-side automation toolkit. Together the two repos cover the full GitFlow lifecycle.
 
 :::note Tech stack
-The workflows are built around **Java 21**, **Spring Boot**, **AWS Elastic Container Registry (ECR)**, and **AWS CodeArtifact**. This reflects the platform they were designed for, but the patterns are straightforward to adapt to any tech stack, cloud provider, or artifact registry.
+The workflows are built around **Java 21**, **Spring Boot**, **Apache Maven**, **AWS Elastic Container Registry (ECR)**, and **AWS CodeArtifact**. This reflects the platform they were designed for, but the patterns are straightforward to adapt to any tech stack, cloud provider, or artifact registry.
 
 **Gradle support** is on the roadmap.
 :::
@@ -48,8 +48,8 @@ flowchart TD
 
 Consumer projects wire in both repos:
 
-- **[gitflow](https://awesomaticza.github.io/gitflow/)** — added as a git submodule in `.gitflow/`. The developer runs `make release` or `make hotfix` locally to create the correct branch and open a PR.
-- **`github-workflows`** (this repository) — referenced via `workflow_call` from the consumer's own `.github/workflows/*.yml`. Once the PR lands on `master`, GitHub Actions takes over: publishing artifacts, tagging the release, and opening a back-merge PR into `develop` automatically.
+- **[gitflow](https://awesomaticza.github.io/gitflow/)** — add this [repository](https://github.com/awesomaticza/gitflow) as a git submodule in root folder of the consumer project. To initiate the process, developers execute `make release` or `make hotfix` locally, which creates the corresponding branch and opens a PR all in one step.
+- **`github-workflows`** - this [repository](https://github.com/awesomaticza/github-workflows) is referenced via `workflow_call` from the consumer's own `.github/workflows` folder. Once the PR lands on `master`, GitHub Actions takes over: publishing artifacts, tagging the release, and opening a back-merge PR into `develop` automatically.
 
 ## Two Project Types
 
