@@ -88,5 +88,5 @@ The merge uses `git merge -X ours origin/master` — if there are conflicts, `de
 :::warning Always merge the back-merge PR
 The back-merge PR is not optional. If you skip it, `develop` diverges from `master`. For a normal release this means the version bump is lost — the next release will be cut from the wrong version. For a hotfix, the fix itself is lost from the development line and will reappear as a bug in the next release.
 
-**Merge the back-merge PR before starting any new feature work.**
+**Always merge the back-merge PR before starting any new feature work.**
 :::
