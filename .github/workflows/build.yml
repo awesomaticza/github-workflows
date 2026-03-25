@@ -34,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      IS_DEPLOYABLE: ${{ inputs.SERVICE_NAME != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +47,7 @@ jobs:
           cache-dependency-path: 'pom.xml'
 
       - name: Set Variables
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         run: |
           PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           BUILD_NUMBER=${{ github.run_number }}
@@ -63,7 +65,7 @@ jobs:
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
       - name: Print variables
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         run: |
           echo "IMAGE_TAG=$IMAGE_TAG"
           echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
@@ -76,7 +78,7 @@ jobs:
           aws-region: ${{ inputs.AWS_REGION }}
 
       - name: Auth via AWS ECR
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
 
       - name: Configure Maven for CodeArtifact
@@ -105,7 +107,7 @@ jobs:
           EOF
 
       - name: Deploy Library Artifact to AWS CodeArtifact
-        if: inputs.SERVICE_NAME == ''
+        if: env.IS_DEPLOYABLE == 'false'
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ inputs.AWS_REGION }}
@@ -115,7 +117,7 @@ jobs:
         run: mvn --no-transfer-progress deploy -B -Pbuild
 
       - name: Build image
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           AWS_REGION: ${{ inputs.AWS_REGION }}
@@ -125,18 +127,18 @@ jobs:
         run: mvn --quiet clean package -Pbuild spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
 
       - name: Push image
-        if: inputs.SERVICE_NAME != ''
-        run: docker push $IMAGE_REGISTRY:$IMAGE_TAG
+        if: env.IS_DEPLOYABLE == 'true'
+        run: docker push "$IMAGE_REGISTRY:$IMAGE_TAG"
 
       - name: Tag and Push Latest Image
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         run: |
-          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:latest
-          docker push $IMAGE_REGISTRY:latest
+          docker tag "$IMAGE_REGISTRY:$IMAGE_TAG" "$IMAGE_REGISTRY:latest"
+          docker push "$IMAGE_REGISTRY:latest"
 
       - name: Tag and Push Image with Git Commit Hash
-        if: inputs.SERVICE_NAME != ''
+        if: env.IS_DEPLOYABLE == 'true'
         run: |
           COMMIT_HASH=$(git rev-parse --short=8 HEAD)
-          docker tag $IMAGE_REGISTRY:$IMAGE_TAG $IMAGE_REGISTRY:$COMMIT_HASH
-          docker push $IMAGE_REGISTRY:$COMMIT_HASH
+          docker tag "$IMAGE_REGISTRY:$IMAGE_TAG" "$IMAGE_REGISTRY:$COMMIT_HASH"
+          docker push "$IMAGE_REGISTRY:$COMMIT_HASH"
