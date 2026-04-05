@@ -8,6 +8,18 @@ sidebar_position: 2
 
 This guide walks you through wiring `github-workflows` into an existing Maven project.
 
+:::info Replace the organization name
+All code examples below reference `awesomaticza/github-workflows`. Replace `awesomaticza` with the GitHub organization or user account where **your fork** of this repository lives.
+
+```yaml
+# Before
+uses: awesomaticza/github-workflows/.github/workflows/build.yml@master
+
+# After (example)
+uses: your-org/github-workflows/.github/workflows/build.yml@master
+```
+:::
+
 ## Prerequisites
 
 | Requirement | Purpose |
