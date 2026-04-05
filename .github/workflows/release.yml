@@ -10,6 +10,10 @@ on:
         required: false
         type: string
         default: ''
+      java-version:
+        required: false
+        type: string
+        default: '21'
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -46,7 +50,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: ${{ inputs.java-version }}
           cache: 'maven'
           cache-dependency-path: 'pom.xml'
 
@@ -209,7 +213,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: ${{ inputs.java-version }}
           cache: 'maven'
       - name: Open PR to align develop with master
         env:
