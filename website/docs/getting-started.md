@@ -74,6 +74,14 @@ jobs:
 
 `SERVICE_NAME` is the name of your ECR repository (e.g. `my-service`). Omit it entirely for library projects.
 
+To use a Java version other than the default (`21`), pass `java-version` in the `with:` block:
+
+```yaml
+    with:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      java-version: '25'
+```
+
 ## Step 2 — Add `release.yml` to your project
 
 Create `.github/workflows/release.yml` in your consumer project.
@@ -91,6 +99,9 @@ on:
 jobs:
   release-workflow:
     uses: awesomaticza/github-workflows/.github/workflows/release.yml@master
+    permissions:
+      contents: write
+      pull-requests: write
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
     secrets:
@@ -117,6 +128,9 @@ on:
 jobs:
   release-workflow:
     uses: awesomaticza/github-workflows/.github/workflows/release.yml@master
+    permissions:
+      contents: write
+      pull-requests: write
     with:
       AWS_REGION: ${{ vars.AWS_REGION }}
       SERVICE_NAME: my-service
@@ -130,6 +144,10 @@ jobs:
       CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
       CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
 ```
+
+:::warning Required permissions on the caller job
+The `permissions` block is **required** on the caller job. GitHub only passes permissions the caller explicitly grants to nested reusable workflow jobs. Without it, the `tag-release` and `merge-2-develop` jobs will fail — `tag-release` needs `contents: write` to push a git tag and create a GitHub Release; `merge-2-develop` needs `contents: write` and `pull-requests: write` to push the back-merge branch and open the PR.
+:::
 
 ## Step 3 — Add secrets and variables to your repository
 

@@ -44,6 +44,26 @@ flowchart TD
     class BUMP,SKIP,PR step
 ```
 
+## Caller Permissions
+
+The job in your project that calls this workflow **must** declare:
+
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
+```
+
+GitHub only passes down the permissions the caller explicitly grants to nested reusable workflow jobs. Without this block, the `tag-release` job cannot push a git tag or create a GitHub Release (`contents: write`), and the `merge-2-develop` job cannot open the back-merge PR (`pull-requests: write`).
+
+## Inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `AWS_REGION` | Yes | — | AWS region for CodeArtifact and ECR |
+| `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
+| `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java` in both the `build` and `merge-2-develop` jobs. |
+
 ## Three Jobs
 
 ### 1. `build`

@@ -47,6 +47,14 @@ flowchart TD
 6. **Build image** _(deployable only)_ — runs `mvn spring-boot:build-image` to produce a Docker image.
 7. **Push image to ECR** _(deployable only)_ — pushes three tags: `x.x.x.<run_number>`, `latest`, and the 8-character commit hash.
 
+## Inputs
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `AWS_REGION` | Yes | — | AWS region for CodeArtifact and ECR |
+| `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
+| `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java`. Set to `'25'` (or any supported version) to override. |
+
 ## The `SERVICE_NAME` Discriminator
 
 `SERVICE_NAME` is an optional workflow input with an empty default. Its presence or absence determines which steps execute:
