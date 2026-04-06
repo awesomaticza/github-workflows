@@ -54,6 +54,7 @@ flowchart TD
 | `AWS_REGION` | Yes | — | AWS region for CodeArtifact and ECR |
 | `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
 | `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java`. Set to `'25'` (or any supported version) to override. |
+| `working-directory` | No | `'.'` | Directory containing `pom.xml`. Set to the service subdirectory in a monorepo. All Maven commands and Docker steps run from this path. |
 
 ## The `SERVICE_NAME` Discriminator
 
@@ -75,6 +76,51 @@ latest
 ```
 
 This differs from the release tag format — see [release.yml](./release) for comparison.
+
+## Monorepo Usage
+
+In a monorepo where the service `pom.xml` lives under a subdirectory, pass `working-directory` to scope all Maven and Docker steps to that path. The default `.` keeps single-repo projects working with no changes.
+
+```yaml
+# .github/workflows/build-my-service.yml
+name: "Build My Service"
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [develop]
+    paths: ['services/my-service/**']   # only trigger for this service
+
+jobs:
+  build-workflow:
+    uses: awesomaticza/github-workflows/.github/workflows/build.yml@master
+    with:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      SERVICE_NAME: my-service
+      java-version: '25'
+      working-directory: services/my-service   # pom.xml lives here
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+      CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+      CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+```
+
+Each service in the monorepo gets its own workflow file with its own `paths:` filter and `working-directory`. A change to `services/payment/**` triggers only the payment service build — other services are unaffected.
+
+```
+monorepo/
+├── services/
+│   ├── my-service/          ← working-directory: services/my-service
+│   │   └── pom.xml
+│   └── payment/             ← working-directory: services/payment
+│       └── pom.xml
+└── .github/workflows/
+    ├── build-my-service.yml
+    └── build-payment.yml
+```
 
 ## Maven Profile
 

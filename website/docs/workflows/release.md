@@ -63,6 +63,7 @@ GitHub only passes down the permissions the caller explicitly grants to nested r
 | `AWS_REGION` | Yes | — | AWS region for CodeArtifact and ECR |
 | `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
 | `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java` in both the `build` and `merge-2-develop` jobs. |
+| `working-directory` | No | `'.'` | Directory containing `pom.xml`. Set to the service subdirectory in a monorepo. Applied to all three jobs: `build`, `tag-release`, and `merge-2-develop`. |
 
 ## Three Jobs
 
@@ -104,6 +105,44 @@ The job also handles the **version bump** logic. It reads the patch component of
 This distinction matters because a hotfix is an emergency patch off `master` — `develop` is already ahead of it and has the correct next version. A normal release, by contrast, has just cut a version that `develop` needs to move past.
 
 The merge uses `git merge -X ours origin/master` — if there are conflicts, `develop`'s files win automatically.
+
+## Monorepo Usage
+
+In a monorepo, pass `working-directory` alongside `paths:` in the trigger to scope the release workflow to a single service. All three jobs (`build`, `tag-release`, `merge-2-develop`) run their Maven and git commands from that subdirectory.
+
+```yaml
+# .github/workflows/release-my-service.yml
+name: "Release My Service"
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+    paths: ['services/my-service/**']   # only trigger for this service
+
+jobs:
+  release-workflow:
+    uses: awesomaticza/github-workflows/.github/workflows/release.yml@master
+    permissions:
+      contents: write
+      pull-requests: write
+    with:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      SERVICE_NAME: my-service
+      java-version: '25'
+      working-directory: services/my-service   # pom.xml lives here
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      CI_APP_ID: ${{ secrets.CI_APP_ID }}
+      CI_APP_PRIVATE_KEY: ${{ secrets.CI_APP_PRIVATE_KEY }}
+      CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+      CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
+      CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
+```
+
+The `merge-2-develop` job reads and bumps `pom.xml` inside `working-directory`, so the version commit and back-merge PR correctly update only the service that was released — other services in the monorepo are untouched.
 
 :::warning Always merge the back-merge PR
 The back-merge PR is not optional. If you skip it, `develop` diverges from `master`. For a normal release this means the version bump is lost — the next release will be cut from the wrong version. For a hotfix, the fix itself is lost from the development line and will reappear as a bug in the next release.

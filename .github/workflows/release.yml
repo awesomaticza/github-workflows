@@ -14,6 +14,10 @@ on:
         required: false
         type: string
         default: '21'
+      working-directory:
+        required: false
+        type: string
+        default: '.'
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -42,6 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     env:
       IS_DEPLOYABLE: ${{ inputs.SERVICE_NAME != '' }}
 
@@ -52,7 +59,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
           cache: 'maven'
-          cache-dependency-path: 'pom.xml'
+          cache-dependency-path: '${{ inputs.working-directory }}/pom.xml'
 
       - name: Set Variables
         if: env.IS_DEPLOYABLE == 'true'
@@ -148,6 +155,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     outputs:
       release-version: ${{ steps.create-tag.outputs.RELEASE_VERSION }}
     steps:
@@ -188,6 +198,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
     steps:
       - uses: actions/create-github-app-token@v2
         id: app-token
