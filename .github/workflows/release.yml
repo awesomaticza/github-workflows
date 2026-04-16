@@ -61,32 +61,12 @@ jobs:
           cache: 'maven'
           cache-dependency-path: '${{ inputs.working-directory }}/pom.xml'
 
-      - name: Set Variables
-        if: env.IS_DEPLOYABLE == 'true'
-        run: |
-          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.SERVICE_NAME }}"
-          IMAGE_TAG=$PROJECT_VERSION
-
-          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-
-      - name: Print variables
-        if: env.IS_DEPLOYABLE == 'true'
-        run: |
-          echo "IMAGE_TAG=$IMAGE_TAG"
-          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.AWS_REGION }}
-
-      - name: Auth via AWS ECR
-        if: env.IS_DEPLOYABLE == 'true'
-        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
 
       - name: Configure Maven for CodeArtifact
         run: |
@@ -112,6 +92,26 @@ jobs:
             </servers>
           </settings>
           EOF
+
+      - name: Set Variables
+        if: env.IS_DEPLOYABLE == 'true'
+        run: |
+          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.SERVICE_NAME }}"
+          IMAGE_TAG=$PROJECT_VERSION
+
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Print variables
+        if: env.IS_DEPLOYABLE == 'true'
+        run: |
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
+
+      - name: Auth via AWS ECR
+        if: env.IS_DEPLOYABLE == 'true'
+        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
 
       - name: Deploy Release Artifact to AWS CodeArtifact
         if: env.IS_DEPLOYABLE == 'false'
@@ -228,6 +228,36 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
           cache: 'maven'
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
+      - name: Configure Maven for CodeArtifact
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ secrets.CODEARTIFACT_DOMAIN }} \
+            --domain-owner ${{ secrets.AWS_ACCOUNT_ID }} \
+            --query authorizationToken --output text)
+
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_RELEASES_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+              <server>
+                <id>${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
       - name: Open PR to align develop with master
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

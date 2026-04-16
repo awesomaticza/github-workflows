@@ -57,40 +57,12 @@ jobs:
           cache: 'maven'
           cache-dependency-path: '${{ inputs.working-directory }}/pom.xml'
 
-      - name: Set Variables
-        if: env.IS_DEPLOYABLE == 'true'
-        run: |
-          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          BUILD_NUMBER=${{ github.run_number }}
-          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.SERVICE_NAME }}"
-
-          if [[ "$PROJECT_VERSION" == *"-SNAPSHOT" ]]; then
-            RELEASE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/-SNAPSHOT//')
-          else
-            RELEASE_VERSION=$PROJECT_VERSION
-          fi
-
-          IMAGE_TAG="${RELEASE_VERSION}.${BUILD_NUMBER}"
-
-          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-
-      - name: Print variables
-        if: env.IS_DEPLOYABLE == 'true'
-        run: |
-          echo "IMAGE_TAG=$IMAGE_TAG"
-          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ inputs.AWS_REGION }}
-
-      - name: Auth via AWS ECR
-        if: env.IS_DEPLOYABLE == 'true'
-        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
 
       - name: Configure Maven for CodeArtifact
         run: |
@@ -116,6 +88,34 @@ jobs:
             </servers>
           </settings>
           EOF
+
+      - name: Set Variables
+        if: env.IS_DEPLOYABLE == 'true'
+        run: |
+          PROJECT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          BUILD_NUMBER=${{ github.run_number }}
+          IMAGE_REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com/${{ inputs.SERVICE_NAME }}"
+
+          if [[ "$PROJECT_VERSION" == *"-SNAPSHOT" ]]; then
+            RELEASE_VERSION=$(echo "$PROJECT_VERSION" | sed 's/-SNAPSHOT//')
+          else
+            RELEASE_VERSION=$PROJECT_VERSION
+          fi
+
+          IMAGE_TAG="${RELEASE_VERSION}.${BUILD_NUMBER}"
+
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY" >> $GITHUB_ENV
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Print variables
+        if: env.IS_DEPLOYABLE == 'true'
+        run: |
+          echo "IMAGE_TAG=$IMAGE_TAG"
+          echo "IMAGE_REGISTRY=$IMAGE_REGISTRY"
+
+      - name: Auth via AWS ECR
+        if: env.IS_DEPLOYABLE == 'true'
+        run: aws ecr get-login-password --region ${{ inputs.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.AWS_REGION }}.amazonaws.com
 
       - name: Deploy Library Artifact to AWS CodeArtifact
         if: env.IS_DEPLOYABLE == 'false'
