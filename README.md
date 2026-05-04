@@ -77,14 +77,14 @@ flowchart TD
 ```
 
 ### `build.yml`
-Triggered when a PR is merged into `develop`. Authenticates with AWS, configures Maven to resolve and deploy to AWS CodeArtifact, then publishes the artifact. If `SERVICE_NAME` is provided, builds a Docker image via `spring-boot:build-image` and pushes it to ECR tagged as `x.x.x.<build_number>`, `latest`, and the short commit hash. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the SNAPSHOT artifact to CodeArtifact.
+Triggered when a PR is merged into `develop`. Authenticates with AWS, configures Maven to resolve and deploy to AWS CodeArtifact, then publishes the artifact. If `SERVICE_NAME` is provided, builds a Docker image via `spring-boot:build-image` and pushes it to ECR tagged as `x.x.x.<build_number>`, `latest`, and the short commit hash. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pci-build` to publish the SNAPSHOT artifact to CodeArtifact.
 
 ### `release.yml`
 Triggered when a PR is merged into `master`. Publishes the release artifact, then:
 1. Creates a git tag and GitHub release for the version in `pom.xml`
 2. Opens a PR to merge `master` back into `develop`, bumping the minor version (e.g. `1.2.0` → `1.3.0-SNAPSHOT`). For hotfixes (patch version > 0), the version bump is skipped.
 
-If `SERVICE_NAME` is provided, builds and pushes the Docker image to ECR tagged with the exact release version, `latest`, and the short commit hash before tagging. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pbuild` to publish the release artifact to CodeArtifact.
+If `SERVICE_NAME` is provided, builds and pushes the Docker image to ECR tagged with the exact release version, `latest`, and the short commit hash before tagging. If `SERVICE_NAME` is omitted, runs `mvn deploy -Pci-build` to publish the release artifact to CodeArtifact.
 
 ## How to Use
 

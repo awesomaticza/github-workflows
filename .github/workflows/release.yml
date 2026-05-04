@@ -125,7 +125,7 @@ jobs:
           CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
           CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
           CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
-        run: mvn --no-transfer-progress deploy -B -Pbuild
+        run: mvn --no-transfer-progress deploy -B -Pci-build
 
       - name: Build image
         if: env.IS_DEPLOYABLE == 'true'
@@ -137,7 +137,7 @@ jobs:
           CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
         run: |
           NATIVE_PROFILE=${{ inputs.native == true && '-Pnative' || '' }}
-          mvn --quiet clean package -Pbuild $NATIVE_PROFILE spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
+          mvn --quiet clean package -Pci-build $NATIVE_PROFILE spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
 
       - name: Push image
         if: env.IS_DEPLOYABLE == 'true'

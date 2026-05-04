@@ -15,10 +15,10 @@ flowchart TD
     A([PR merged into master]) --> BUILD_JOB["Job: build"]
 
     BUILD_JOB --> B{SERVICE_NAME provided?}
-    B -- No --> LIB_RELEASE["mvn deploy -Pbuild<br/>→ CodeArtifact release artifact"]
+    B -- No --> LIB_RELEASE["mvn deploy -Pci-build<br/>→ CodeArtifact release artifact"]
     B -- Yes --> NATIVE{native: true?}
-    NATIVE -- No --> JVM_RELEASE["mvn spring-boot:build-image -Pbuild<br/>JVM image → ECR:<br/>x.x.x · latest · sha"]
-    NATIVE -- Yes --> NAT_RELEASE["mvn spring-boot:build-image -Pbuild -Pnative<br/>GraalVM native image → ECR:<br/>x.x.x · latest · sha"]
+    NATIVE -- No --> JVM_RELEASE["mvn spring-boot:build-image -Pci-build<br/>JVM image → ECR:<br/>x.x.x · latest · sha"]
+    NATIVE -- Yes --> NAT_RELEASE["mvn spring-boot:build-image -Pci-build -Pnative<br/>GraalVM native image → ECR:<br/>x.x.x · latest · sha"]
 
     LIB_RELEASE --> TAG_JOB["Job: tag-release"]
     JVM_RELEASE --> TAG_JOB
@@ -83,7 +83,7 @@ Identical to `build.yml` except the image tag for deployables is the **exact pro
 | `build.yml` | `x.x.x.<run_number>` |
 | `release.yml` | `x.x.x` |
 
-For libraries, runs `mvn deploy -Pbuild` to publish the release JAR to CodeArtifact.
+For libraries, runs `mvn deploy -Pci-build` to publish the release JAR to CodeArtifact.
 
 ### 2. `tag-release`
 

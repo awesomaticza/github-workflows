@@ -21,14 +21,14 @@ flowchart TD
     DEP_PATH --> AUTH
 
     AUTH --> CA_TOKEN["Get CodeArtifact token<br/>Configure Maven settings.xml"]
-    CA_TOKEN --> LIB_BUILD["mvn deploy -Pbuild<br/>→ CodeArtifact SNAPSHOT"]
+    CA_TOKEN --> LIB_BUILD["mvn deploy -Pci-build<br/>→ CodeArtifact SNAPSHOT"]
 
     CA_TOKEN --> SET_VARS["Set IMAGE_TAG = x.x.x.&lt;run_number&gt;<br/>Set IMAGE_REGISTRY"]
     SET_VARS --> ECR_LOGIN["Auth via AWS ECR"]
     ECR_LOGIN --> NATIVE{native: true?}
 
-    NATIVE -- No --> JVM_BUILD["mvn spring-boot:build-image -Pbuild<br/>JVM Docker image"]
-    NATIVE -- Yes --> NATIVE_BUILD["mvn spring-boot:build-image -Pbuild -Pnative<br/>GraalVM native image<br/>&lt;1s startup · lower memory"]
+    NATIVE -- No --> JVM_BUILD["mvn spring-boot:build-image -Pci-build<br/>JVM Docker image"]
+    NATIVE -- Yes --> NATIVE_BUILD["mvn spring-boot:build-image -Pci-build -Pnative<br/>GraalVM native image<br/>&lt;1s startup · lower memory"]
 
     JVM_BUILD --> PUSH["Push to ECR:<br/>x.x.x.run_num · latest · sha"]
     NATIVE_BUILD --> PUSH
@@ -50,7 +50,7 @@ flowchart TD
 2. **Configure AWS Credentials** — authenticates with AWS using `aws-actions/configure-aws-credentials@v4`.
 3. **Auth via AWS ECR** _(deployable only)_ — logs Docker into the ECR registry.
 4. **Configure Maven for CodeArtifact** — obtains a short-lived CodeArtifact token and writes `~/.m2/settings.xml` with the release and snapshot server credentials.
-5. **Deploy Library Artifact** _(library only)_ — runs `mvn deploy -Pbuild` to publish the SNAPSHOT JAR to CodeArtifact.
+5. **Deploy Library Artifact** _(library only)_ — runs `mvn deploy -Pci-build` to publish the SNAPSHOT JAR to CodeArtifact.
 6. **Build image** _(deployable only)_ — runs `mvn spring-boot:build-image` to produce a Docker image. When `native: true`, adds `-Pnative` to activate the GraalVM Buildpack — the native image is compiled inside Docker, no local GraalVM installation required.
 7. **Push image to ECR** _(deployable only)_ — pushes three tags: `x.x.x.<run_number>`, `latest`, and the 8-character commit hash.
 
@@ -168,4 +168,4 @@ Verify the native image boots correctly locally (`mvn spring-boot:build-image -P
 
 ## Maven Profile
 
-All Maven commands pass `-Pbuild`. Your project's `pom.xml` must define a `build` profile. The `exec-maven-plugin` submodule-update executions are typically bound to the default lifecycle; the `build` profile suppresses them on CI. See [Getting Started](../getting-started) for the Maven configuration.
+All Maven commands pass `-Pci-build`. Your project's `pom.xml` must define a `ci-build` profile. The `exec-maven-plugin` submodule-update executions are typically bound to the default lifecycle; the `ci-build` profile suppresses them on CI. See [Getting Started](../getting-started) for the Maven configuration.

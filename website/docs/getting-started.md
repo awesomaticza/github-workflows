@@ -27,7 +27,7 @@ uses: your-org/github-workflows/.github/workflows/build.yml@master
 | GitHub repository with `master` and `develop` branches | GitFlow branching model |
 | A registered GitHub App with `contents: write` and `pull-requests: write` permissions | Required by the release workflow to push version-bump commits and create PRs without `GITHUB_TOKEN` restrictions — see [GitHub App Setup](./guides/github-app-setup) |
 | AWS account with ECR and/or CodeArtifact set up | Artifact storage |
-| `pom.xml` in the project root with a `-Pbuild` Maven profile | Used by all Maven commands in the workflows |
+| `pom.xml` in the project root with a `ci-build` Maven profile | Used by all Maven commands in the workflows |
 
 For the developer-side automation (creating release and hotfix branches), see [gitflow →](https://awesomaticza.github.io/gitflow/)
 
