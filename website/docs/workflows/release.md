@@ -16,10 +16,13 @@ flowchart TD
 
     BUILD_JOB --> B{SERVICE_NAME provided?}
     B -- No --> LIB_RELEASE["mvn deploy -Pbuild<br/>→ CodeArtifact release artifact"]
-    B -- Yes --> DEP_RELEASE["mvn spring-boot:build-image<br/>Push to ECR:<br/>x.x.x · latest · sha"]
+    B -- Yes --> NATIVE{native: true?}
+    NATIVE -- No --> JVM_RELEASE["mvn spring-boot:build-image -Pbuild<br/>JVM image → ECR:<br/>x.x.x · latest · sha"]
+    NATIVE -- Yes --> NAT_RELEASE["mvn spring-boot:build-image -Pbuild -Pnative<br/>GraalVM native image → ECR:<br/>x.x.x · latest · sha"]
 
     LIB_RELEASE --> TAG_JOB["Job: tag-release"]
-    DEP_RELEASE --> TAG_JOB
+    JVM_RELEASE --> TAG_JOB
+    NAT_RELEASE --> TAG_JOB
 
     TAG_JOB --> TAG["Create git tag x.x.x<br/>Create GitHub Release"]
     TAG --> MERGE_JOB["Job: merge-2-develop"]
@@ -37,10 +40,13 @@ flowchart TD
     classDef decision fill:#7d4e00,stroke:#7d4e00,color:#ffffff
     classDef gitop fill:#3d1a78,stroke:#3d1a78,color:#ffffff
 
+    classDef native fill:#4a1a6b,stroke:#4a1a6b,color:#ffffff
+
     class BUILD_JOB,TAG_JOB,MERGE_JOB job
     class TAG gitop
-    class LIB_RELEASE,DEP_RELEASE artifact
-    class C decision
+    class LIB_RELEASE,JVM_RELEASE artifact
+    class NAT_RELEASE native
+    class C,NATIVE decision
     class BUMP,SKIP,PR step
 ```
 
@@ -64,6 +70,7 @@ GitHub only passes down the permissions the caller explicitly grants to nested r
 | `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
 | `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java` in both the `build` and `merge-2-develop` jobs. |
 | `working-directory` | No | `'.'` | Directory containing `pom.xml`. Set to the service subdirectory in a monorepo. Applied to all three jobs: `build`, `tag-release`, and `merge-2-develop`. |
+| `native` | No | `false` | When `true`, adds `-Pnative` to the build-image command to produce a GraalVM native image. Match this to your `build.yml` setting — the same image type should be used across both SNAPSHOT and release builds. Requires a `native` Maven profile with `native-maven-plugin` in `pom.xml`. |
 
 ## Three Jobs
 
@@ -131,6 +138,7 @@ jobs:
       SERVICE_NAME: my-service
       java-version: '25'
       working-directory: services/my-service   # pom.xml lives here
+      native: true                             # match your build.yml setting
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}

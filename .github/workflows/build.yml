@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: '.'
+      native:
+        required: false
+        type: boolean
+        default: false
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -135,7 +139,9 @@ jobs:
           CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
           CODEARTIFACT_RELEASES_REPO: ${{ secrets.CODEARTIFACT_RELEASES_REPO }}
           CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
-        run: mvn --quiet clean package -Pbuild spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
+        run: |
+          NATIVE_PROFILE=${{ inputs.native == true && '-Pnative' || '' }}
+          mvn --quiet clean package -Pbuild $NATIVE_PROFILE spring-boot:build-image --no-transfer-progress -Dspring-boot.build-image.imageName=$IMAGE_REGISTRY:$IMAGE_TAG
 
       - name: Push image
         if: env.IS_DEPLOYABLE == 'true'
