@@ -158,7 +158,7 @@ jobs:
 ```
 
 :::warning Required permissions on the caller job
-The `permissions` block is **required** on the caller job. GitHub only passes permissions the caller explicitly grants to nested reusable workflow jobs. Without it, the `tag-release` and `merge-2-develop` jobs will fail — `tag-release` needs `contents: write` to push a git tag and create a GitHub Release; `merge-2-develop` needs `contents: write` and `pull-requests: write` to push the back-merge branch and open the PR.
+The `permissions` block is **required** on the caller job. GitHub only passes permissions the caller explicitly grants to nested reusable workflow jobs. Without it, the `tag-release` and `back-merge-2-develop` jobs will fail — `tag-release` needs `contents: write` to push a git tag and create a GitHub Release; `back-merge-2-develop` needs `contents: write` and `pull-requests: write` to push the back-merge branch and open the PR.
 :::
 
 ## Step 3 — Add secrets and variables to your repository

@@ -12,7 +12,7 @@ The `release.yml` workflow authenticates as a GitHub App rather than using the d
 
 GitHub intentionally prevents `GITHUB_TOKEN` from triggering further workflow runs. This is a security guardrail to prevent infinite CI loops.
 
-The `merge-2-develop` job creates a version-bump commit and opens a PR into `develop`. That PR needs to re-trigger the `build.yml` CI workflow on `develop` — which it will not do if the commit was made with `GITHUB_TOKEN`.
+The `back-merge-2-develop` job creates a version-bump commit and opens a PR into `develop`. That PR needs to re-trigger the `build.yml` CI workflow on `develop` — which it will not do if the commit was made with `GITHUB_TOKEN`.
 
 A GitHub App token does not carry this restriction. When the app pushes the commit, GitHub treats it as a third-party actor and triggers workflows normally.
 
