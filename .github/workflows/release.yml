@@ -198,7 +198,7 @@ jobs:
           git push origin "$RELEASE_VERSION"
           gh release create $RELEASE_VERSION --title "$RELEASE_VERSION" --generate-notes
 
-  merge-2-develop:
+  back-merge-2-develop:
     needs: [ tag-release ]
     runs-on: ubuntu-latest
     permissions:

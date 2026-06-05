@@ -25,7 +25,7 @@ flowchart TD
     NAT_RELEASE --> TAG_JOB
 
     TAG_JOB --> TAG["Create git tag x.x.x<br/>Create GitHub Release"]
-    TAG --> MERGE_JOB["Job: merge-2-develop"]
+    TAG --> MERGE_JOB["Job: back-merge-2-develop"]
 
     MERGE_JOB --> C{Hotfix?<br/>patch &gt; 0?}
     C -- No --> BUMP["Increment minor version<br/>e.g. 1.2.0 → 1.3.0-SNAPSHOT"]
@@ -60,7 +60,7 @@ permissions:
   pull-requests: write
 ```
 
-GitHub only passes down the permissions the caller explicitly grants to nested reusable workflow jobs. Without this block, the `tag-release` job cannot push a git tag or create a GitHub Release (`contents: write`), and the `merge-2-develop` job cannot open the back-merge PR (`pull-requests: write`).
+GitHub only passes down the permissions the caller explicitly grants to nested reusable workflow jobs. Without this block, the `tag-release` job cannot push a git tag or create a GitHub Release (`contents: write`), and the `back-merge-2-develop` job cannot open the back-merge PR (`pull-requests: write`).
 
 ## Inputs
 
@@ -68,8 +68,8 @@ GitHub only passes down the permissions the caller explicitly grants to nested r
 |---|---|---|---|
 | `AWS_REGION` | Yes | — | AWS region for CodeArtifact and ECR |
 | `SERVICE_NAME` | No | `''` | ECR repository name. Omit for library projects. |
-| `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java` in both the `build` and `merge-2-develop` jobs. |
-| `working-directory` | No | `'.'` | Directory containing `pom.xml`. Set to the service subdirectory in a monorepo. Applied to all three jobs: `build`, `tag-release`, and `merge-2-develop`. |
+| `java-version` | No | `'21'` | Temurin JDK version passed to `actions/setup-java` in both the `build` and `back-merge-2-develop` jobs. |
+| `working-directory` | No | `'.'` | Directory containing `pom.xml`. Set to the service subdirectory in a monorepo. Applied to all three jobs: `build`, `tag-release`, and `back-merge-2-develop`. |
 | `native` | No | `false` | When `true`, adds `-Pnative` to the build-image command to produce a GraalVM native image. Match this to your `build.yml` setting — the same image type should be used across both SNAPSHOT and release builds. Requires a `native` Maven profile with `native-maven-plugin` in `pom.xml`. |
 
 ## Three Jobs
@@ -98,7 +98,7 @@ Uses a **GitHub App token** (not `GITHUB_TOKEN`) to:
 `GITHUB_TOKEN` cannot trigger further workflow runs — a security restriction GitHub imposes to prevent infinite loops. The version-bump commit and back-merge PR created in the next job need to re-trigger CI on `develop`. A GitHub App token bypasses this restriction. See [GitHub App Setup](../guides/github-app-setup).
 :::
 
-### 3. `merge-2-develop`
+### 3. `back-merge-2-develop`
 
 Opens a PR to keep `develop` in sync with `master` after the release. The branch is named `merge/<version>`.
 
@@ -115,7 +115,7 @@ The merge uses `git merge -X ours origin/master` — if there are conflicts, `de
 
 ## Monorepo Usage
 
-In a monorepo, pass `working-directory` alongside `paths:` in the trigger to scope the release workflow to a single service. All three jobs (`build`, `tag-release`, `merge-2-develop`) run their Maven and git commands from that subdirectory.
+In a monorepo, pass `working-directory` alongside `paths:` in the trigger to scope the release workflow to a single service. All three jobs (`build`, `tag-release`, `back-merge-2-develop`) run their Maven and git commands from that subdirectory.
 
 ```yaml
 # .github/workflows/release-my-service.yml
@@ -150,7 +150,7 @@ jobs:
       CODEARTIFACT_SNAPSHOTS_REPO: ${{ secrets.CODEARTIFACT_SNAPSHOTS_REPO }}
 ```
 
-The `merge-2-develop` job reads and bumps `pom.xml` inside `working-directory`, so the version commit and back-merge PR correctly update only the service that was released — other services in the monorepo are untouched.
+The `back-merge-2-develop` job reads and bumps `pom.xml` inside `working-directory`, so the version commit and back-merge PR correctly update only the service that was released — other services in the monorepo are untouched.
 
 :::warning Always merge the back-merge PR
 The back-merge PR is not optional. If you skip it, `develop` diverges from `master`. For a normal release this means the version bump is lost — the next release will be cut from the wrong version. For a hotfix, the fix itself is lost from the development line and will reappear as a bug in the next release.
