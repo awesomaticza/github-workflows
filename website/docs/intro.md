@@ -76,7 +76,7 @@ flowchart TD
     RELEASE -- "SERVICE_NAME absent" --> CA_R["AWS CodeArtifact<br/>Release artifact"]
     RELEASE -- "SERVICE_NAME present" --> ECR_R["AWS ECR<br/>x.x.x · latest · sha"]
     RELEASE --> TAG["Git Tag + GitHub Release"]
-    TAG --> M2D["PR: merge/x.x.x → develop<br/>+ version bump"]
+    TAG --> M2D["PR: back-merge/x.x.x → develop<br/>+ version bump"]
 
     classDef trigger fill:#003366,stroke:#003366,color:#ffffff
     classDef workflow fill:#155724,stroke:#155724,color:#ffffff
