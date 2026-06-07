@@ -31,7 +31,7 @@ flowchart TD
     C -- No --> BUMP["Increment minor version<br/>e.g. 1.2.0 → 1.3.0-SNAPSHOT"]
     C -- Yes --> SKIP["Skip version bump<br/>develop keeps current SNAPSHOT"]
 
-    BUMP --> PR["Open PR: merge/x.x.x → develop"]
+    BUMP --> PR["Open PR: back-merge/x.x.x → develop"]
     SKIP --> PR
 
     classDef job fill:#003366,stroke:#003366,color:#ffffff
@@ -100,7 +100,7 @@ Uses a **GitHub App token** (not `GITHUB_TOKEN`) to:
 
 ### 3. `back-merge-2-develop`
 
-Opens a PR to keep `develop` in sync with `master` after the release. The branch is named `merge/<version>`.
+Opens a PR to keep `develop` in sync with `master` after the release. The branch is named `back-merge/<version>`.
 
 The job also handles the **version bump** logic. It reads the patch component of the release version:
 

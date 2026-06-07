@@ -252,7 +252,7 @@ jobs:
           [[ ! -x "$(command -v gh)" ]] && echo "gh not found, you need to install github CLI" && exit 1
           [[ ! -x "$(command -v mvn)" ]] && echo "mvn not found, you need to install maven CLI" && exit 1
 
-          BRANCH_NAME="merge/$RELEASE_VERSION"
+          BRANCH_NAME="back-merge/$RELEASE_VERSION"
           message ">>> Create $BRANCH_NAME from develop"
           git checkout -b "$BRANCH_NAME"
 
